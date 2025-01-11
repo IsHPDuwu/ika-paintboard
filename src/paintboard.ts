@@ -273,4 +273,12 @@ export class PaintBoardManager {
 		}
 		return { uid: 0x39c5bb, timestamp: 0x39c5bb }
 	}
+
+	public async fillpxs(x0: number, y0: number, x1: number, y1: number, color: Color): Promise<void> {
+		for (let y = y0; y < y1; y++) {
+			for (let x = x0; x < x1; x++) {
+				this.setPixel(x, y, color, 0x39c5bb)
+			}
+		}
+	}
 }
