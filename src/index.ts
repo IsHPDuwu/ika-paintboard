@@ -134,16 +134,18 @@ const server = Bun.serve<WebSocketData>({
 		)
 	},
 	fetch: async (req: Request, server) => {
-		const ip = server.requestIP(req)
+		// const ip = server.requestIP(req)
+		// 这个 ip 只有 127.0.0.1 如何解决
+		const ip = req.headers.get('cf-connecting-ip') ?? req.headers.get('x-forwarded-for') ?? server.requestIP(req)?.address
 
 		// 检查是否被封禁
-		if (ip && isBanned(ip.address)) {
+		if (ip && isBanned(ip)) {
 			return new Response('Too Many Requests', {
 				status: 429,
 				headers: {
 					'Access-Control-Allow-Origin': '*',
 					'Retry-After': Math.ceil(
-						(bannedIPs.get(ip.address)! - Date.now()) / 1000
+						(bannedIPs.get(ip)! - Date.now()) / 1000
 					).toString()
 				}
 			})
