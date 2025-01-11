@@ -48,6 +48,15 @@ export type QueryVisData = {
 	y: number
 }
 
+export type FillData = {
+	token: string
+	x0: number
+	y0: number
+	x1: number
+	y1: number
+	color: string
+}
+
 export type WebSocketData = {
 	connId: number
 	connectedAt: number

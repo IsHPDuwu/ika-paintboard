@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { parse as parseYaml } from 'yaml'
 import pino from 'pino'
 import { PaintBoardManager } from './paintboard'
-import { type TokenRequest, PaintResultCode, type WebSocketData, type BanUidData, type QueryVisData } from './types'
+import { type TokenRequest, PaintResultCode, type WebSocketData, type BanUidData, type QueryVisData, type FillData, type Color } from './types'
 import Bun from 'bun'
 import workerpool from 'workerpool'
 
@@ -199,8 +199,7 @@ const server = Bun.serve<WebSocketData>({
 				[paintboard.getSharedArrayBuffer(), config.width, config.height]
 			)
 			logger.debug(
-				`getboard: ${Date.now() - startTime}ms (gzip) ${bufferSize} -> ${
-					compressed.length
+				`getboard: ${Date.now() - startTime}ms (gzip) ${bufferSize} -> ${compressed.length
 				} (${(compressed.length / bufferSize).toFixed(2)}x)`
 			)
 			return new Response(compressed, {
@@ -236,8 +235,7 @@ const server = Bun.serve<WebSocketData>({
 				[paintboard.getSharedArrayBuffer(), config.width, config.height]
 			)
 			logger.debug(
-				`getimage: ${
-					Date.now() - startTime
+				`getimage: ${Date.now() - startTime
 				}ms (webp-lossless) ${bufferSize} -> ${compressed.length} (${(
 					compressed.length / bufferSize
 				).toFixed(2)}x)`
@@ -253,7 +251,7 @@ const server = Bun.serve<WebSocketData>({
 		if (url.pathname === '/api/auth/gettoken' && req.method === 'POST') {
 			return await handleTokenRequest(req)
 		}
-		
+
 		if (url.pathname === '/api/root/banuid' && req.method === 'POST') {
 			try {
 				const body = (await req.json()) as BanUidData
@@ -329,6 +327,37 @@ const server = Bun.serve<WebSocketData>({
 						uid: vis.uid,
 						timestamp: vis.timestamp
 					}
+				}), {
+					status: 200,
+					headers: {
+						'Access-Control-Allow-Origin': '*'
+					}
+				})
+			} catch (err) { // req.json might be invalid
+				return new Response('Bad Request', {
+					status: 400,
+					headers: {
+						'Access-Control-Allow-Origin': '*'
+					}
+				})
+			}
+		}
+
+		if (url.pathname === '/api/root/fill' && req.method === 'POST') {
+			try {
+				const body = (await req.json()) as FillData
+				if (body.token !== config.rootToken) {
+					return new Response('Forbidden', {
+						status: 403,
+						headers: {
+							'Access-Control-Allow-Origin': '*'
+						}
+					})
+				}
+				const color = { r: parseInt(body.color.slice(0, 2), 16), g: parseInt(body.color.slice(2, 4), 16), b: parseInt(body.color.slice(4, 6), 16) } as Color
+				await paintboard.fillpxs(body.x0, body.y0, body.x1, body.y1, color)
+				return new Response(JSON.stringify({
+					statusCode: 200,
 				}), {
 					status: 200,
 					headers: {
@@ -496,8 +525,7 @@ const server = Bun.serve<WebSocketData>({
 							if (!ws.data.waitingPong) {
 								// 如果服务端未发送ping就收到pong，直接关闭连接
 								logger.warn(
-									`${colorHash(ws.data.connId)} Received unexpected pong from ${
-										ws.data.ip
+									`${colorHash(ws.data.connId)} Received unexpected pong from ${ws.data.ip
 									}`
 								)
 								ws.close(1002, 'Protocol violation: unexpected pong')
@@ -524,7 +552,7 @@ const server = Bun.serve<WebSocketData>({
 
 						case 0xfe: {
 							// C2S paint (31字节)
-							
+
 							const x = dataView.getUint16(offset, true) // 添加 true 表示小端序
 							const y = dataView.getUint16(offset + 2, true)
 							const color = {
@@ -554,14 +582,12 @@ const server = Bun.serve<WebSocketData>({
 								ws.data.tokenUsageCount.add(token)
 							}
 							let result = 0x00
-							if (bannedUIDs.has(uid))
-							{
+							if (bannedUIDs.has(uid)) {
 								result = PaintResultCode.NO_PERMISSION
 							}
-							else
-							{
+							else {
 								// 检查是否在活动时间内
-								if(Date.now() > config.activityEndTime || Date.now() < config.activityStartTime) {
+								if (Date.now() > config.activityEndTime || Date.now() < config.activityStartTime) {
 									logger.info('Painting before activity started or after ended, terminating connection')
 									ws.close(1003, 'Activity not started or already ended')
 									return
@@ -606,11 +632,11 @@ const server = Bun.serve<WebSocketData>({
 	port: config.port,
 	...(config.key && config.cert
 		? {
-				tls: {
-					key: Bun.file(config.key),
-					cert: Bun.file(config.cert)
-				}
-		  }
+			tls: {
+				key: Bun.file(config.key),
+				cert: Bun.file(config.cert)
+			}
+		}
 		: {})
 })
 
@@ -713,7 +739,7 @@ async function handleTokenRequest(req: Request): Promise<Response> {
 				}
 			)
 		}
-		
+
 		// 添加 UID 范围检查
 		if (config.maxAllowedUID && body.uid > config.maxAllowedUID) {
 			return new Response(
